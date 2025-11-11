@@ -1,0 +1,9 @@
+config.toml
+
+.idea/
+tests/
+.streamlit/
+.venv/
+archive/
+__pycache__/
+documents/
