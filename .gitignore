@@ -1,5 +1,6 @@
 config.toml
 
+#directories
 .idea/
 tests/
 .streamlit/
@@ -7,3 +8,6 @@ tests/
 archive/
 __pycache__/
 documents/
+citation_pdfs/
+assets/
+static/

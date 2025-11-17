@@ -16,49 +16,8 @@ import base64
 import warnings
 from functools import partial
 
-
+from GlobalUtils.openai_uploading import get_or_upload_async
 from CDOTCostData.cost_data_utils import ItemSearchWrapper
-
-# <editor-fold desc="openai file uploading & caching">
-def sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def load_cache(cache_path) -> dict:
-    cache_path = cache_path
-    if cache_path.exists():
-        return json.loads(cache_path.read_text())
-    return {}
-
-
-def save_cache(cache_path: Path, cache: dict):
-    cache_path.write_text(json.dumps(cache))
-
-
-async def get_or_upload_async(file_path: str, client: AsyncOpenAI, cache_path: str, purpose="user_data") -> str:
-    cache_path = Path(cache_path)
-    file_path = Path(file_path)
-    cache = load_cache(cache_path)
-    digest = sha256(file_path)
-
-    # 1. Cache hit ➜ just return the ID
-    if digest in cache:
-        return cache[digest]
-
-    # 2. Cache miss ➜ upload once
-    with open(file_path, "rb") as f:
-        creation_resp = await client.files.create(file=f, purpose=purpose)
-        file_id = creation_resp.id
-
-    # 3. Remember it for next time
-    cache[digest] = file_id
-    save_cache(cache_path, cache)
-    return file_id
-# </editor-fold>
 
 class ProjectItem(BaseModel):
     item_number: str
@@ -328,7 +287,7 @@ async def get_project_items(
     return matched_items, final_undecided_items
 
 
-async def get_item_weighted_avg_bid(
+async def get_item_wab_n_cdot_name(
         project_item: ProjectItem,
         item_search_wrappers: list[ItemSearchWrapper], # in descending chronological order, most recent first
         search_agent_prompt: str, extract_wab_prompts: dict[int, str],
@@ -373,7 +332,11 @@ async def get_item_weighted_avg_bid(
         if matched_item is not None:
             break
     if matched_item is None:
-        return None, None
+        return {
+            'cdot_name': None,
+            'wab_float': None,
+            'matched_year': None
+        }
 
     wab_extraction_inputs = [
         {
@@ -392,9 +355,14 @@ async def get_item_weighted_avg_bid(
     )
 
     wab_float = wab_extraction_response.output_parsed.weighted_average_average_bid_for_year
-    return wab_float, matched_item_year
+    item_info_dict = {
+        'cdot_name': matched_item['name'],
+        'wab_float': wab_float,
+        'matched_year': matched_item_year
+    }
+    return item_info_dict
 
-async def batch_item_weighted_avg_bids(
+async def batch_item_wabs_n_cdot_names(
         items_list: ProjectItemsList,
         item_search_wrappers: list[ItemSearchWrapper],
         search_agent_prompt: str, extract_wab_prompts: dict[int, str],
@@ -402,7 +370,7 @@ async def batch_item_weighted_avg_bids(
 ) -> float | None:
     wab_coroutines = []
     for project_item in items_list.items:
-        wab_coroutines.append(get_item_weighted_avg_bid(project_item, item_search_wrappers, search_agent_prompt, extract_wab_prompts, async_client, model=model))
+        wab_coroutines.append(get_item_wab_n_cdot_name(project_item, item_search_wrappers, search_agent_prompt, extract_wab_prompts, async_client, model=model))
     return await asyncio.gather(*wab_coroutines)
 
 if __name__ == '__main__':
