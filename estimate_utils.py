@@ -17,54 +17,36 @@ import warnings
 from functools import partial
 
 from GlobalUtils.openai_uploading import get_or_upload_async
-from CDOTCostData.cost_data_utils import ItemSearchWrapper
+from CDOTCostData.cost_data_utils import ItemSearchWrapper#, ProjectItem, ProjectItemsList
 
 class ProjectItem(BaseModel):
     item_number: str
     item_name: str
     unit: str
     quantity: int | float
+    # citation_lines: list[str]
 
 class ProjectItemsList(BaseModel):
     items: list[ProjectItem]
 
-class ItemChoice(BaseModel):
-    item_id: int
-    item_number: str
-    item_name: str
-
-class WeightedAverageBid(BaseModel):
-    weighted_average_average_bid_for_year: float | None
-
-
-@function_tool
-def report_item_choice(item_choice: ItemChoice) -> str:
-    '''Report the item result corresponding to the weighted average bid for the year.'''
-    return item_choice
-
-@function_tool
-def report_failure_to_find_item(explanation: str) -> str:
-    '''Report failure to find item in cost data.'''
-    return explanation
-
-def confirm_items_match(item1: ProjectItem, item2: dict, item_name_match_threshold: float = 80.) -> bool:
+def confirm_items_match(item1: ProjectItem, item2: ProjectItem, item_name_match_threshold: float = 80.) -> bool:
     '''Raise an error if item1 (ProjectItem) and item2 (dict) do not match in name and unit.'''
-    if item1.item_number.strip().lower() != item2['item_number'].strip().lower():
+    if item1.item_number.strip().lower() != item2.item_number.strip().lower():
         return False
-    if item1.unit.strip().lower() != item2['unit'].strip().lower():
+    if item1.unit.strip().lower() != item2.unit.strip().lower():
         return False
-    if fuzz.ratio(item1.item_name.lower().strip(), item2['item_name'].lower().strip()) < item_name_match_threshold:
+    if fuzz.ratio(item1.item_name.lower().strip(), item2.item_name.lower().strip()) < item_name_match_threshold:
         return False
     return True
 
-def match_project_items(openai_project_items_list: ProjectItemsList, claude_project_items_list: list[dict], item_name_match_threshold: float = 80.):
+def match_project_items(openai_project_items_list: list[ProjectItem], claude_project_items_list: list[ProjectItem], item_name_match_threshold: float = 80.):
     '''Compare two lists of project items extracted by different models, and return a tuple of (matched_items, disputed_items, openai_unmatched_items, claude_unmatched_items)'''
     scores = []
     for openai_idx, openai_item in enumerate(openai_project_items_list):
         for claude_idx, claude_item in enumerate(claude_project_items_list):
-            score = fuzz.ratio(openai_item.item_number.lower().strip(), claude_item['item_number'].lower().strip())
-            score += fuzz.ratio(openai_item.item_name.lower().strip(), claude_item['item_name'].lower().strip())
-            score += fuzz.ratio(openai_item.unit.lower().strip(), claude_item['unit'].lower().strip())
+            score = fuzz.ratio(openai_item.item_number.lower().strip(), claude_item.item_number.lower().strip())
+            score += fuzz.ratio(openai_item.item_name.lower().strip(), claude_item.item_name.lower().strip())
+            score += fuzz.ratio(openai_item.unit.lower().strip(), claude_item.unit.lower().strip())
             scores.append((score, openai_idx, claude_idx))
     scores = sorted(scores, key=lambda x: x[0], reverse=True)
     matched_openai_indices = set()
@@ -77,7 +59,7 @@ def match_project_items(openai_project_items_list: ProjectItemsList, claude_proj
         openai_item = openai_project_items_list[openai_idx]
         claude_item = claude_project_items_list[claude_idx]
         if confirm_items_match(openai_item, claude_item, item_name_match_threshold):
-            if abs(openai_item.quantity - claude_item['quantity']) > 0.1:
+            if abs(openai_item.quantity - claude_item.quantity) > 0.1:
                 disputed_items.append([openai_item, claude_item])
             else:
                 matched_items.append(openai_item)
@@ -89,22 +71,23 @@ def match_project_items(openai_project_items_list: ProjectItemsList, claude_proj
 
 async def check_disputed_pair(
         openai_item: ProjectItem,
-        claude_item: dict,
-        project_items_table_path: str,
-        openai_async_client: AsyncOpenAI, openai_files_cache_path: str, openai_model: str,
+        claude_item: ProjectItem,
+        project_items_pdf_base_64: str,
+        openai_project_items_file_id: str,
+        openai_async_client: AsyncOpenAI, openai_model: str,
         async_claude_client: AsyncAnthropic, claude_model: str,
         item_name_match_threshold: float = 80.,
         project_items_table_ocr_str: str|None=None
 ):
     item_name = None
     if fuzz.ratio(openai_item.item_name.lower().strip(),
-                  claude_item['item_name'].lower().strip()) >= item_name_match_threshold:
+                  claude_item.item_name.lower().strip()) >= item_name_match_threshold:
         item_name = openai_item.item_name
     item_number = None
-    if openai_item.item_number == claude_item['item_number']:
+    if openai_item.item_number == claude_item.item_number:
         item_number = openai_item.item_number
     unit = None
-    if openai_item.unit == claude_item['unit']:
+    if openai_item.unit == claude_item.unit:
         unit = openai_item.unit
     extraction_prompt = 'Please extract the item number, item name, unit, and quantity for the item described below, from the attached table: \n'
     if item_number is not None:
@@ -129,7 +112,7 @@ async def check_disputed_pair(
                     'source': {
                         'type': 'base64',
                         'media_type': 'application/pdf',
-                        'data': base64_pdf_string
+                        'data': project_items_pdf_base_64
                     }
                 }
             ]
@@ -139,9 +122,11 @@ async def check_disputed_pair(
             'content': '{'
         }
     ]
-    claude_check_couroutine = async_claude_client.messages.create(model=claude_model,
-                                                                  messages=claude_check_inputs,
-                                                                  max_tokens=10_000)
+    claude_check_couroutine = async_claude_client.messages.create(
+        model=claude_model,
+        messages=claude_check_inputs,
+        max_tokens=10_000
+    )
 
     # openai extraction
     openai_check_inputs = [
@@ -154,7 +139,7 @@ async def check_disputed_pair(
                 },
                 {
                     'type': 'input_file',
-                    'file_id': project_items_file_id
+                    'file_id': openai_project_items_file_id
                 }]
         }
     ]
@@ -168,21 +153,21 @@ async def check_disputed_pair(
     openai_check_item = check_results[0].output_parsed
     claude_check_item = json.loads('{'+check_results[1].content[0].text)
     if (
-            openai_check_item.item_number == claude_check_item['item_number']
-            and fuzz.ratio(openai_check_item.item_name.strip().lower(), claude_check_item['item_name'].strip().lower()) >= item_name_match_threshold
-            and openai_check_item.unit.strip().lower() == claude_check_item['unit'].strip().lower()
-            and abs(openai_check_item.quantity - claude_check_item['quantity']) < 0.1
+            openai_check_item.item_number == claude_check_item.item_number
+            and fuzz.ratio(openai_check_item.item_name.strip().lower(), claude_check_item.item_name.strip().lower()) >= item_name_match_threshold
+            and openai_check_item.unit.strip().lower() == claude_check_item.unit.strip().lower()
+            and abs(openai_check_item.quantity - claude_check_item.quantity) < 0.1
     ):
         return True, openai_check_item
     else:
         final_item = {}
-        if openai_check_item.item_number == claude_check_item['item_number']:
+        if openai_check_item.item_number == claude_check_item.item_number:
             final_item['item_number'] = openai_check_item.item_number
-        if fuzz.ratio(openai_check_item.item_name.strip().lower(), claude_check_item['item_name'].strip().lower()) >= item_name_match_threshold:
+        if fuzz.ratio(openai_check_item.item_name.strip().lower(), claude_check_item.item_name.strip().lower()) >= item_name_match_threshold:
             final_item['item_name'] = openai_check_item.item_name
-        if openai_check_item.unit.strip().lower() == claude_check_item['unit'].strip().lower():
+        if openai_check_item.unit.strip().lower() == claude_check_itemunit.strip().lower():
             final_item['unit'] = openai_check_item.unit
-        if abs(openai_check_item.quantity - claude_check_item['quantity']) < 0.1:
+        if abs(openai_check_item.quantity - claude_check_item.quantity) < 0.1:
             final_item['quantity'] = openai_check_item.quantity
         return False, final_item
 
@@ -258,16 +243,18 @@ async def get_project_items(
 
     openai_extraction_response, claude_extraction_response = await asyncio.gather(openai_extraction_coroutine, claude_extraction_couroutine)
     openai_project_items_list = openai_extraction_response.output_parsed.items
-    claude_project_items_list = json.loads('['+claude_extraction_response.content[0].text)
+    claude_project_items_json = json.loads('['+claude_extraction_response.content[0].text)
+    claude_project_items_list = [ProjectItem.model_validate(item) for item in claude_project_items_json]
 
+    print('claude project items list:',claude_project_items_list) # TODO REMOVE
     matched_items, disputed_items, openai_unmatched_items, claude_unmatched_items = match_project_items(openai_project_items_list, claude_project_items_list, item_name_match_threshold=item_name_match_threshold)
 
-    final_undecided_items = claude_unmatched_items
-    final_undecided_items.extend([item.model_dump() for item in openai_unmatched_items])
+    final_undecided_items = [item.model_dump() for item in claude_unmatched_items + openai_unmatched_items]
 
     check_disputed_pair_partial = partial(
         check_disputed_pair,
-        project_items_table_path=project_items_table_path,
+        project_items_pdf_base_64 = base64_pdf_string,
+        openai_project_items_file_id = project_items_file_id,
         openai_async_client=openai_async_client, openai_files_cache_path=openai_files_cache_path, openai_model=openai_model,
         async_claude_client=async_claude_client, claude_model=claude_model,
         item_name_match_threshold=item_name_match_threshold,
@@ -286,92 +273,6 @@ async def get_project_items(
             final_undecided_items.append(final_item)
     return matched_items, final_undecided_items
 
-
-async def get_item_wab_n_cdot_name(
-        project_item: ProjectItem,
-        item_search_wrappers: list[ItemSearchWrapper], # in descending chronological order, most recent first
-        search_agent_prompt: str, extract_wab_prompts: dict[int, str],
-        async_client: AsyncOpenAI, model: str = 'gpt-5'
-) -> float | None:
-    '''Get the weighted average bid for the year for a given project item. If unable to find item, return None.'''
-    matched_item = None
-    matched_item_year = None
-    for search_wrapper in item_search_wrappers:
-        search_tool = search_wrapper.create_search_tool()
-        search_agent = Agent(
-            name=f'"{project_item.item_name}" Item Search Agent',
-            instructions=search_agent_prompt,
-            tools=[search_tool, report_item_choice, report_failure_to_find_item],
-            tool_use_behavior={'stop_at_tool_names': [report_item_choice.name, report_failure_to_find_item.name]},
-            reset_tool_choice=False,
-            model=model
-        )
-        agent_input = [
-            {
-                'role': 'user',
-                'content': f"Find the weighted average bid (year) for the following project item:\n\nItem Number: {project_item.item_number}\nItem Name: {project_item.item_name}\nUnit: {project_item.unit}\nQuantity: {project_item.quantity}\n\nCall the report_item_choice tool to report your result. If you cannot find the item, call the report_failure_to_find_item tool with an explanation."
-            }
-        ]
-        search_result = await Runner.run(search_agent, input=agent_input, run_config=RunConfig(
-            workflow_name="(EE) Item search workflow"))  # todo max turns (incl in prompt)
-
-
-        for i, item in enumerate(search_result.new_items):
-            if (
-                    i > 0 and
-                    isinstance(item, agents.items.ToolCallOutputItem) and
-                    isinstance(search_result.new_items[i-1], agents.items.ToolCallItem)
-            ):
-                if search_result.new_items[i-1].raw_item.name == report_item_choice.name:
-                    item_choice = item.output
-                    matched_item = search_wrapper.choice_to_item(item_choice)
-                    matched_item_year = search_wrapper.year
-                    break
-                elif search_result.new_items[i-1].raw_item.name == report_failure_to_find_item.name:
-                    break
-        if matched_item is not None:
-            break
-    if matched_item is None:
-        return {
-            'cdot_name': None,
-            'wab_float': None,
-            'matched_year': None
-        }
-
-    wab_extraction_inputs = [
-        {
-            'role': 'system',
-            'content': extract_wab_prompts[matched_item_year]
-        },
-        {
-            'role': 'user',
-            'content': '\n'.join(matched_item['lines'])
-        }
-    ]
-    wab_extraction_response = await async_client.responses.parse(
-        input = wab_extraction_inputs,
-        model = model,
-        text_format = WeightedAverageBid
-    )
-
-    wab_float = wab_extraction_response.output_parsed.weighted_average_average_bid_for_year
-    item_info_dict = {
-        'cdot_name': matched_item['name'],
-        'wab_float': wab_float,
-        'matched_year': matched_item_year
-    }
-    return item_info_dict
-
-async def batch_item_wabs_n_cdot_names(
-        items_list: ProjectItemsList,
-        item_search_wrappers: list[ItemSearchWrapper],
-        search_agent_prompt: str, extract_wab_prompts: dict[int, str],
-        async_client: AsyncOpenAI, model: str = 'gpt-5'
-) -> float | None:
-    wab_coroutines = []
-    for project_item in items_list.items:
-        wab_coroutines.append(get_item_wab_n_cdot_name(project_item, item_search_wrappers, search_agent_prompt, extract_wab_prompts, async_client, model=model))
-    return await asyncio.gather(*wab_coroutines)
 
 if __name__ == '__main__':
     with open('../changeorders/config.toml', 'rb') as f:
