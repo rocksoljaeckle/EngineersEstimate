@@ -1,5 +1,3 @@
-config.toml
-
 #directories
 .idea/
 tests/
