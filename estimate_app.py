@@ -463,7 +463,7 @@ def render_estimate_table():
 
 
 
-os.listdir('prompts') # TODO REMOVE
+print(os.listdir('prompts')) # TODO REMOVE
 if 'config' not in st.session_state:
     with open('config.toml', 'rb') as f:
         st.session_state['config'] = tomli.load(f)
