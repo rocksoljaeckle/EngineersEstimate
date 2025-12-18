@@ -1,54 +1,54 @@
 openai_files_cache_path = 'openai_files_cache.json'
 
-openai_extract_project_items_prompt_path = 'prompts\openai_extract_project_items_prompt.md'
-claude_extract_project_items_prompt_path = 'prompts\claude_extract_project_items_prompt.md'
-search_agent_prompt_path = 'prompts\search_extract_item_choice.md'
-citation_prompt_path = 'prompts\global_prompts\citation_prompt.md'
-cost_data_citation_prompt_path = 'prompts\cost_data_prompts\cost_data_citation_prompt.md'
+openai_extract_project_items_prompt_path = 'prompts/openai_extract_project_items_prompt.md'
+claude_extract_project_items_prompt_path = 'prompts/claude_extract_project_items_prompt.md'
+search_agent_prompt_path = 'prompts/search_extract_item_choice.md'
+citation_prompt_path = 'prompts/global_prompts/citation_prompt.md'
+cost_data_citation_prompt_path = 'prompts/cost_data_prompts/cost_data_citation_prompt.md'
 
-citation_cache_json_path = 'citation_cache\citation_cache.json'
-citation_images_cache_dir = 'citation_cache\cached_images'
+citation_cache_json_path = 'citation_cache/citation_cache.json'
+citation_images_cache_dir = 'citation_cache/cached_images'
 
 wab_cache_json_path = 'wab_cache.json'
 
-project_items_table_path = 'documents\Nederland SAQ.pdf'
+project_items_table_path = 'documents/Nederland SAQ.pdf'
 
-app_background_image_path = 'assets\blurred_engineer_3.png'
+app_background_image_path = 'assets/blurred_engineer_3.png'
 
 openai_model = 'gpt-5.2'
 claude_model = 'claude-opus-4-5-20251101'
 
 [[extract_wab_prompts_paths]]
 year = 2022
-path = 'prompts\extract_wab_prompts\extract_wab_prompt_2022.md'
+path = 'prompts/extract_wab_prompts/extract_wab_prompt_2022.md'
 
 [[extract_wab_prompts_paths]]
 year = 2023
-path = 'prompts\extract_wab_prompts\extract_wab_prompt_2023.md'
+path = 'prompts/extract_wab_prompts/extract_wab_prompt_2023.md'
 
 [[extract_wab_prompts_paths]]
 year = 2024
-path = 'prompts\extract_wab_prompts\extract_wab_prompt_2024.md'
+path = 'prompts/extract_wab_prompts/extract_wab_prompt_2024.md'
 
 
 
 [[cost_data_books]]
 year = 2024
-path = 'cost_data_books\documents\cdot-cost-data-book-q4-2024.txt'
-pdf_path = 'cost_data_books\documents\2024-cost-data-book.pdf'
-cost_items_pkl_path = 'cost_data_books\cost_items\2024_cost_items.pkl'
+path = 'cost_data_books/documents/cdot-cost-data-book-q4-2024.txt'
+pdf_path = 'cost_data_books/documents/2024-cost-data-book.pdf'
+cost_items_pkl_path = 'cost_data_books/cost_items/2024_cost_items.pkl'
 start_line = 1790
 
 [[cost_data_books]]
 year = 2023
-path = 'cost_data_books\documents\2023_cost_data_book.txt'
-pdf_path = 'cost_data_books\documents\cost-data-book-2023.pdf'
-cost_items_pkl_path = 'cost_data_books\cost_items\2023_cost_items.pkl'
+path = 'cost_data_books/documents/2023_cost_data_book.txt'
+pdf_path = 'cost_data_books/documents/cost-data-book-2023.pdf'
+cost_items_pkl_path = 'cost_data_books/cost_items/2023_cost_items.pkl'
 start_line = 455
 
 [[cost_data_books]]
 year = 2022
-path = 'cost_data_books\documents\copy_of_2022-cost-data-book.txt'
-pdf_path = 'cost_data_books\documents\2022-cost-data-book.pdf'
-cost_items_pkl_path = 'cost_data_books\cost_items\2022_cost_items.pkl'
+path = 'cost_data_books/documents/copy_of_2022-cost-data-book.txt'
+pdf_path = 'cost_data_books/documents/2022-cost-data-book.pdf'
+cost_items_pkl_path = 'cost_data_books/cost_items/2022_cost_items.pkl'
 start_line = 472
