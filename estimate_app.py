@@ -157,8 +157,8 @@ async def get_estimate_citation_images(
         openai_client=openai_client,
         text_preprocessor=lambda x: x.lower(),
         use_cache = True,
-        cache_json_path = st.session_state['cdot_cost_data_config']['citation_cache_json_path'],
-        cache_dir = st.session_state['cdot_cost_data_config']['citation_images_cache_dir'],
+        cache_json_path = st.session_state['config']['citation_cache_json_path'],
+        cache_dir = st.session_state['config']['citation_images_cache_dir'],
     )
     saq_citation_images, cost_data_citation_result = await asyncio.gather(
         saq_citation_task,
@@ -255,7 +255,7 @@ def generate_estimate(
             unstract_api_key = st.secrets['unstract_api_key'],
             openai_api_key = st.secrets['openai_api_key'],
             async_openai_client=async_openai_client,
-            openai_files_cache_path=st.session_state['global_config']['openai_files_cache_path'],
+            openai_files_cache_path=st.secrets['openai_files_cache_path'],
             openai_extract_project_items_prompt=st.session_state['openai_extract_project_items_prompt'],
             openai_model = st.session_state['config']['openai_model'],
             async_claude_client=async_claude_client,
@@ -264,7 +264,7 @@ def generate_estimate(
             cost_items_lists = st.session_state['cost_items_lists'],
             search_agent_prompt = st.session_state['search_agent_prompt'],
             extract_wab_prompts = st.session_state['extract_wab_prompts'],
-            wab_cache_path = st.session_state['cdot_cost_data_config']['wab_cache_json_path'],
+            wab_cache_path = st.session_state['config']['wab_cache_json_path'],
         )
         st.session_state['wab_items'], st.session_state['final_undecided_items'] = asyncio.run(estimator.get_wabs())
         st.session_state['unstract_response_json'] = estimator.table_unstract_json_response
@@ -460,18 +460,9 @@ def render_estimate_table():
                     st.session_state['final_undecided_items'].pop(i)
                     st.rerun()
 
-# <editor-fold> Config Loading
-if 'cdot_cost_data_config' not in st.session_state:
-    with open('../cdotcostdata/config.toml', 'rb') as f:
-        st.session_state['cdot_cost_data_config'] = tomli.load(f)
-    with open(st.session_state['cdot_cost_data_config']['cost_data_citation_prompt_path'], 'r', encoding='utf-8') as f:
-        st.session_state['cost_data_citation_prompt'] = f.read()
 
 
 
-if 'global_config' not in st.session_state:
-    with open('../GlobalUtils/config.toml', 'rb') as f:
-        st.session_state['global_config'] = tomli.load(f)
 
 if 'config' not in st.session_state:
     with open('config.toml', 'rb') as f:
@@ -484,17 +475,19 @@ if 'config' not in st.session_state:
         st.session_state['search_agent_prompt'] = f.read()
     with open(st.session_state['config']['citation_prompt_path'], 'r', encoding='utf-8') as f:
         st.session_state['citation_prompt'] = f.read()
+    with open(st.session_state['config']['cost_data_citation_prompt_path'], 'r', encoding='utf-8') as f:
+        st.session_state['cost_data_citation_prompt'] = f.read()
     st.session_state['extract_wab_prompts'] = {}
     for wab_prompt_ref in st.session_state['config']['extract_wab_prompts_paths']:
         with open(wab_prompt_ref['path'], 'r', encoding='utf-8') as f:
             st.session_state['extract_wab_prompts'][wab_prompt_ref['year']] = f.read()
-# </editor-fold>
+
 
 
 if 'cost_items_lists' not in st.session_state:
     st.session_state['cost_items_lists'] = []
     st.session_state['cost_item_pdf_paths'] = {}
-    for cost_book_ref in st.session_state['cdot_cost_data_config']['cost_data_books']:
+    for cost_book_ref in st.session_state['config']['cost_data_books']:
         with open(cost_book_ref['cost_items_pkl_path'], 'rb') as f:
             cost_items = pickle.load(f)
         st.session_state['cost_items_lists'].append([cost_items, cost_book_ref['year']])
