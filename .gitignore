@@ -1,7 +1,8 @@
+.streamlit/secrets.toml
+
 #directories
 .idea/
 tests/
-.streamlit/
 .venv/
 archive/
 __pycache__/

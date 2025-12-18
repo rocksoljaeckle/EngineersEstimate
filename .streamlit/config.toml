@@ -1,0 +1,8 @@
+[server]
+port = 8510
+enableStaticServing = true
+sslCertFile = "ssl/domain.crt"
+sslKeyFile = "ssl/domain.key"
+
+[ui]
+hideTopBar = true
