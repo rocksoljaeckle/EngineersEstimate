@@ -255,7 +255,7 @@ def generate_estimate(
             unstract_api_key = st.secrets['unstract_api_key'],
             openai_api_key = st.secrets['openai_api_key'],
             async_openai_client=async_openai_client,
-            openai_files_cache_path=st.secrets['openai_files_cache_path'],
+            openai_files_cache_path=st.session_state['config']['openai_files_cache_path'],
             openai_extract_project_items_prompt=st.session_state['openai_extract_project_items_prompt'],
             openai_model = st.session_state['config']['openai_model'],
             async_claude_client=async_claude_client,
