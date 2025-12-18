@@ -87,8 +87,8 @@ def add_item_dialog():
     item_name = st.text_input(f'Item name')
     item_number = st.text_input(f'Item number')
     item_unit = st.text_input(f'Unit')
-    item_quantity = st.number_input(f'Quantity')
-    user_wab = st.number_input(f'Weighted Average Bid (per unit)', step = 1., width=200)
+    item_quantity = st.number_input(f'Quantity', min_value = 0)
+    user_wab = st.number_input(f'Weighted Average Bid (per unit)', min_value = 0., step = 1., width=200)
 
     addable = (item_name != '') and (item_number != '') and (item_unit != '') and (user_wab > 0)
     if st.button(f'Add "{item_name}" to Estimate', key=f'add_undecided', disabled=(not addable)):
@@ -367,15 +367,16 @@ def render_estimate_table():
 
             l_col, mid_col, r_col = st.columns([1,1,3])
             with l_col.container(border=True, height = 200):
-                new_wab = st.number_input('Edit Weighted Average Bid', value=selected_row['Weighted Average Bid'], step = 1., width=200)
+                wab_type = type(selected_row['Weighted Average Bid'])
+                new_wab = st.number_input('Edit Weighted Average Bid', value=selected_row['Weighted Average Bid'], min_value = wab_type(0), step = wab_type(1), width=200)
                 if st.button('Update WAB for selected item'):
                     item_info_dict['wab_float'] = new_wab
                     st.session_state['wab_items'][idx] = item_info_dict
                     st.rerun()
 
             with mid_col.container(border=True, height = 200):
-                # st.write('')
-                new_quantity = st.number_input('Edit Quantity', value=selected_row['Quantity'], step = 1.,  width=200)
+                quantity_type = type(selected_row['Quantity'])
+                new_quantity = st.number_input('Edit Quantity', value=selected_row['Quantity'], min_value = quantity_type(0), step = quantity_type(1),  width=200)
                 if st.button('Update quantity for selected item'):
                     item_info_dict['ProjectItem'].quantity = new_quantity
                     st.session_state['wab_items'][idx] = item_info_dict
@@ -416,7 +417,7 @@ def render_estimate_table():
                 st.markdown(f'- **Quantity:** {item.quantity}')
                 st.markdown(
                     f'The WAB could not be determined for this item. Enter it below to include it in the estimate.')
-                user_wab = st.number_input(f'Enter WAB for item {item.item_name} (per unit)', step = 1., width=200)
+                user_wab = st.number_input(f'Enter WAB for item {item.item_name} (per unit)', min_value = 0., step = 1., width=200)
                 if st.button(f'Add {item.item_name} to Estimate with new WAB', key=f'add_{i}'):
                     item_info_dict['wab_float'] = user_wab
                     st.session_state['wab_items'][i] = item_info_dict
@@ -436,6 +437,7 @@ def render_estimate_table():
                 user_wab = st.number_input(
                     f'Enter WAB for item {item_dict.get('item_name', 'Unnamed Item')} (per unit)',
                     step=1.,
+                    min_value = 0.,
                     width=200,
                     key=f'undecided_item_wab_{i}')
 
