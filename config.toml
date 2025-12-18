@@ -34,21 +34,21 @@ path = 'prompts/extract_wab_prompts/extract_wab_prompt_2024.md'
 
 [[cost_data_books]]
 year = 2024
-path = 'cost_data_books/documents/cdot-cost-data-book-q4-2024.txt'
-pdf_path = 'cost_data_books/documents/2024-cost-data-book.pdf'
+path = 'cost_data_books/docs/cdot-cost-data-book-q4-2024.txt'
+pdf_path = 'cost_data_books/docs/2024-cost-data-book.pdf'
 cost_items_pkl_path = 'cost_data_books/cost_items/2024_cost_items.pkl'
 start_line = 1790
 
 [[cost_data_books]]
 year = 2023
-path = 'cost_data_books/documents/2023_cost_data_book.txt'
-pdf_path = 'cost_data_books/documents/cost-data-book-2023.pdf'
+path = 'cost_data_books/docs/2023_cost_data_book.txt'
+pdf_path = 'cost_data_books/docs/cost-data-book-2023.pdf'
 cost_items_pkl_path = 'cost_data_books/cost_items/2023_cost_items.pkl'
 start_line = 455
 
 [[cost_data_books]]
 year = 2022
-path = 'cost_data_books/documents/copy_of_2022-cost-data-book.txt'
-pdf_path = 'cost_data_books/documents/2022-cost-data-book.pdf'
+path = 'cost_data_books/docs/copy_of_2022-cost-data-book.txt'
+pdf_path = 'cost_data_books/docs/2022-cost-data-book.pdf'
 cost_items_pkl_path = 'cost_data_books/cost_items/2022_cost_items.pkl'
 start_line = 472
