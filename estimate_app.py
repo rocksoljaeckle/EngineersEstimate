@@ -331,7 +331,7 @@ def render_estimate_table():
                 cdot_name,
                 wab_index,  # index within st.session_state['wab_items']
             ]
-            data_row = [item.round(2) if isinstance(item, float) else item for item in data_row]
+            data_row = [round(item, 2) if isinstance(item, float) else item for item in data_row]
             wab_data.append(data_row)
 
     wab_df = pd.DataFrame(wab_data, columns=['Item Name', 'Item Number', 'Unit', 'Quantity', 'Cost Data Book Year',
