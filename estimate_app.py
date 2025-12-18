@@ -462,7 +462,8 @@ def render_estimate_table():
 
 
 
-
+print('debug statements:')
+print(os.listdir('.')) # TODO REMOVE
 print(os.listdir('prompts')) # TODO REMOVE
 if 'config' not in st.session_state:
     with open('config.toml', 'rb') as f:
