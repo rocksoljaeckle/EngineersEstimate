@@ -1,6 +1,7 @@
 from tempfile import TemporaryDirectory
 import pandas as pd
 import streamlit as st
+from st_aggrid import AgGrid, GridOptionsBuilder
 from streamlit_image_zoom import image_zoom
 import tomli
 import asyncio
@@ -15,97 +16,65 @@ import datetime
 from functools import partial
 import time
 import mimetypes
+from pandas import DataFrame
 import base64
 
-from estimate_utils import get_project_items
-from GlobalUtils.ocr import google_ocr_pdf_text_overlay, whisper_pdf_text_extraction
-from GlobalUtils.citation import get_unstract_citation_images
-from GlobalUtils.st_file_serving import StreamlitPDFServer
-from CDOTCostData.cost_data_utils import (
-    ItemSearchWrapper,
-    batch_item_wabs_n_cdot_names,
-    ProjectItem,
-    ProjectItemsList
+
+from estimate_utils import (
+    get_project_items,
+    Estimator,
 )
-from CDOTCostData.cost_data_citation import extract_item_citation_images_pages
+from estimate_global_utils import (
+    get_unstract_citation_images,
+    StreamlitPDFServer,
+)
+from estimate_cdot_utils import (
+    ProjectItem,
+    extract_item_citation_images_pages,
+)
+
+
 
 # <editor-fold> Authentication
-PASSWORD = st.secrets.get("APP_PASSWORD", "change_me")
 
-if "auth_ok" not in st.session_state:
-    st.session_state.auth_ok = False
-    notification.notify(
-        app_name='Engineer\'s Estimate  App',
-        title='Login Event',
-        message=f'Login at {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}.',
-        timeout=10
-    )
-
-
-if not st.session_state.auth_ok:
-    with st.form("login", clear_on_submit=False):
-        pw = st.text_input("Password", type="password")
-        if st.form_submit_button("Enter"):
-            if pw == PASSWORD:
-                st.session_state.auth_ok = True
-            else:
-                st.error("Nope.")
+if not st.user.is_logged_in:
+    if st.button('Log in with Microsoft'):
+        st.login('microsoft')
     st.stop()
 # </editor-fold>
 
-def get_wabs(
-        claude_api_key: str,
-        openai_api_key: str,
-        project_items_table_path: str,
-        openai_files_cache_path: str,
-        openai_extract_project_items_prompt: str,
-        claude_extract_project_items_prompt: str,
-        search_agent_prompt: str,
-        extract_wab_prompts: dict[int, str],
-        cost_items_lists: dict,
-        claude_model: str,
-        openai_model: str,
-        project_items_table_ocr_str: str|None = None
-):
-    '''Get weighted average bids for project items from a project items table.
+def get_aggrid_options(df: DataFrame, hidden_cols: list[str]):
+    """Get AgGrid grid options for a given DataFrame."""
+    gb = GridOptionsBuilder.from_dataframe(dataframe=df)
+    gb.configure_selection('single', use_checkbox=False)
+    gb.configure_auto_height(autoHeight=False)
+    for hidden in hidden_cols:
+        gb.configure_column(hidden, hide = True)
+    return gb.build()
 
-    Returns a list of tuples dictionaries with 'ProjectItem', 'wab_float', 'cdot_name', and 'matched_year' keys, and a list of undecided items.
-    '''
-    set_default_openai_key(openai_api_key)
-    openai_async_client = AsyncOpenAI(api_key=openai_api_key)
+@st.dialog('Help', width='large')
+def show_help_dialog():
+    """Display the help documentation in a dialog."""
+    help_html_path = os.path.join(os.path.dirname(__file__), 'help.html')
+    if os.path.exists(help_html_path):
+        with open(help_html_path, 'r', encoding='utf-8') as f:
+            help_html = f.read()
+        st.components.v1.html(help_html, height=700, scrolling=True)
+    else:
+        st.error('Help file not found.')
 
-    async_claude_client = AsyncAnthropic(api_key=claude_api_key)
-
-    project_items_list, final_undecided_items = asyncio.run(get_project_items(
-        project_items_table_path,
-        openai_async_client, openai_files_cache_path, openai_extract_project_items_prompt, openai_model,
-        async_claude_client, claude_extract_project_items_prompt, claude_model,
-        project_items_table_ocr_str = project_items_table_ocr_str
-    ))
-    project_items_list = ProjectItemsList(items = project_items_list)
-
-    item_search_wrappers = [ItemSearchWrapper(cost_items, year) for year, cost_items in cost_items_lists.items()]
-
-    item_info_dicts = asyncio.run(
-        batch_item_wabs_n_cdot_names(project_items_list, item_search_wrappers, search_agent_prompt,
-                                     extract_wab_prompts, openai_async_client, model=openai_model,
-                                     use_cache=True, cache_path=st.session_state['cdot_cost_data_config']['wab_cache_json_path'])
-    )
-    out_items = [
-        {
-            'cdot_name': item_dict['cdot_name'],
-            'wab_float': item_dict['wab_float'],
-            'matched_year': item_dict['matched_year'],
-            'ProjectItem': item 
-        }
-        for item_dict, item in zip(item_info_dicts, project_items_list.items)
-    ]
-
-    return out_items, final_undecided_items
+@st.dialog('Confirm rerun', on_dismiss='rerun')
+def confirm_rerun_dialog():
+    st.markdown('Are you sure you want to rerun the estimation? This will clear all results.')
+    if st.button('Rerun', type = 'primary'):
+        st.session_state['saq_file_name'] = saq_file.name
+        generate_estimate(saq_file)
+        st.rerun()
+    if st.button('Cancel'):
+        st.rerun()
 
 @st.dialog('Confirm Delete', on_dismiss = 'rerun')
 def confirm_delete_dialog(item_name: str, item_index: int):
-    st.session_state['editor_key'] += 1  # force refresh of data editor
     st.markdown(f'Are you sure you want to delete item **{item_name}** from the estimate? This action cannot be undone.')
     if st.button('Confirm Delete'):
         st.session_state['wab_items'].pop(item_index)
@@ -122,7 +91,7 @@ def add_item_dialog():
     user_wab = st.number_input(f'Weighted Average Bid (per unit)', width=200)
 
     addable = (item_name != '') and (item_number != '') and (item_unit != '') and (user_wab > 0)
-    if st.button(f'Add "{item_name}" to Estimate', key=f'add_undecided_{i}', disabled=(not addable)):
+    if st.button(f'Add "{item_name}" to Estimate', key=f'add_undecided', disabled=(not addable)):
         new_item = ProjectItem(
             item_name=item_name,
             item_number=item_number,
@@ -132,6 +101,7 @@ def add_item_dialog():
         new_item_dict = {
             'cdot_name': None,
             'wab_float': user_wab,
+            'matched_year': None,
             'ProjectItem': new_item
         }
         st.session_state['wab_items'].append(new_item_dict)
@@ -156,7 +126,7 @@ async def get_estimate_citation_images(
 
     print('Creating citation for item with cdot name: ', cdot_name)
 
-    openai_client = AsyncOpenAI(api_key=st.session_state['ddl_config']['openai_api_key'])
+    openai_client = AsyncOpenAI(api_key=st.secrets['openai_api_key'])
     saq_citation_query = f'Item Name: {item.item_name}, Item Number: {item.item_number}, Unit: {item.unit}, Quantity: {item.quantity}'
     saq_citation_task = get_unstract_citation_images(
         pdf_source=st.session_state['saq_file_bytes'],
@@ -183,7 +153,7 @@ async def get_estimate_citation_images(
         cost_item=cost_item_dict,
         input_pdf_path=cost_item_pdf_path,
         citation_prompt=st.session_state['cost_data_citation_prompt'],
-        unstract_api_key=st.session_state['config']['unstract_api_key'],
+        unstract_api_key=st.secrets['unstract_api_key'],
         openai_client=openai_client,
         text_preprocessor=lambda x: x.lower(),
         use_cache = True,
@@ -210,10 +180,8 @@ def show_citation_dialog(
         wab: float|None = None,
         cdot_name: str|None = None
 ):
-    st.session_state['editor_key'] += 1  # force refresh of data editor
     st.markdown(f'### Finding source for: {item.item_name}')
     st.markdown(f'**Item Number:** {item.item_number} | **Unit:** {item.unit} | **Quantity:** {item.quantity} | **WAB:** \\$ {wab:,.2f}')
-
 
     if not st.session_state.get('saq_file_bytes') or not st.session_state.get('unstract_response_json'):
         st.error('Citation is only available when using "unstract whisper" file processing mode.')
@@ -265,8 +233,7 @@ def show_citation_dialog(
         st.warning('No citations found for this item. The source may not be clearly identifiable in the document.')
 
 def generate_estimate(
-        saq_file,
-        file_processing_mode: str
+        saq_file
 ):
     # Clear citation cache when generating new estimate
     if 'citation_cache' in st.session_state:
@@ -280,51 +247,67 @@ def generate_estimate(
         temp_table_path = os.path.join(tmpdir, saq_file.name)
         with open(temp_table_path, 'wb') as f:
             f.write(saq_file.getvalue())
-
-        wab_partial_func = partial(get_wabs,
-                                   claude_api_key=st.session_state['config']['anthropic_api_key'],
-                                   openai_api_key=st.session_state['ddl_config']['openai_api_key'],
-                                   openai_files_cache_path=st.session_state['ddl_config']['openai_files_cache_path'],
-                                   openai_extract_project_items_prompt=st.session_state[
-                                       'openai_extract_project_items_prompt'],
-                                   claude_extract_project_items_prompt=st.session_state[
-                                       'claude_extract_project_items_prompt'],
-                                   search_agent_prompt=st.session_state['search_agent_prompt'],
-                                   extract_wab_prompts=st.session_state['extract_wab_prompts'],
-                                   cost_items_lists=st.session_state['cost_items_lists'],
-                                   openai_model=st.session_state['config']['openai_model'],
-                                   claude_model=st.session_state['config']['claude_model']
-                                   )
-        match file_processing_mode:
-            case 'none':
-                st.session_state['wab_items'], st.session_state['final_undecided_items'] = wab_partial_func(
-                    project_items_table_path=temp_table_path)
-            case 'unstract whisper':
-                st.session_state['saq_file_bytes'] = saq_file.read()  # store PDF bytes for citation generation
-                try:
-                    st.session_state['unstract_response_json'] = whisper_pdf_text_extraction(
-                        st.session_state['config']['unstract_api_key'], temp_table_path, return_json=True)
-                except TimeoutError as e:
-                    st.error(
-                        'Unstract API request timed out. Please try again later, or try a different file processing mode.')
-                    st.markdown(
-                        'Unstract\'s LLMWhisperer API goes down occasionally due to high demand. check <https://status.unstract.com/> for current status.')
-                    raise e
-                project_items_table_ocr_str = st.session_state['unstract_response_json']['result_text']
-                st.session_state['wab_items'], st.session_state['final_undecided_items'] = wab_partial_func(
-                    project_items_table_path=temp_table_path, project_items_table_ocr_str=project_items_table_ocr_str)
-            case 'google ocr':
-                temp_ocr_table_path = os.path.join(tmpdir, 'ocr_' + saq_file.name)
-                google_ocr_pdf_text_overlay(temp_table_path, temp_ocr_table_path, dpi=300)
-                st.session_state['wab_items'], st.session_state['final_undecided_items'] = wab_partial_func(
-                    project_items_table_path=temp_ocr_table_path)
+        st.session_state['saq_file_bytes'] = saq_file.getvalue()
+        async_openai_client = AsyncOpenAI(api_key = st.secrets['openai_api_key'])
+        async_claude_client = AsyncAnthropic(api_key=st.secrets['anthropic_api_key'])
+        estimator = Estimator(
+            project_items_table_path = temp_table_path,
+            unstract_api_key = st.secrets['unstract_api_key'],
+            openai_api_key = st.secrets['openai_api_key'],
+            async_openai_client=async_openai_client,
+            openai_files_cache_path=st.session_state['global_config']['openai_files_cache_path'],
+            openai_extract_project_items_prompt=st.session_state['openai_extract_project_items_prompt'],
+            openai_model = st.session_state['config']['openai_model'],
+            async_claude_client=async_claude_client,
+            claude_extract_project_items_prompt=st.session_state['claude_extract_project_items_prompt'],
+            claude_model = st.session_state['config']['claude_model'],
+            cost_items_lists = st.session_state['cost_items_lists'],
+            search_agent_prompt = st.session_state['search_agent_prompt'],
+            extract_wab_prompts = st.session_state['extract_wab_prompts'],
+            wab_cache_path = st.session_state['cdot_cost_data_config']['wab_cache_json_path'],
+        )
+        st.session_state['wab_items'], st.session_state['final_undecided_items'] = asyncio.run(estimator.get_wabs())
+        st.session_state['unstract_response_json'] = estimator.table_unstract_json_response
 
         if not st.session_state['wab_items']:
             st.error(
                 'Could not extract any project items from the table. Please check the file and try again, or try a different file processing mode.')
 
 
+def get_estimate_table_html(
+        source_file_name: str,
+        data_df: pd.DataFrame,
+        hidden_cols: list[str],
+        total_estimate: float,
+        excluded_indices: list[int]
+) -> str:
+    missing_items = len(excluded_indices) + len(st.session_state['final_undecided_items']) > 0
+    display_columns = [col for col in data_df.columns if col not in hidden_cols]
+
+    table_html = f'<html><head><title>Estimate items from "{source_file_name}"</title></head>'
+    table_html += f'<body><h1>Cost items table from "{source_file_name}"</h1>'
+    table_html += f'<h3>Total Engineer\'s Estimate: ${total_estimate:,.2f}</h3>'
+    if missing_items:
+        table_html += '<strong style="color:red;">Note: Some items were excluded from this estimate due to missing WABs or parsing errors.</strong>'
+    table_html += '<div style="height: 20px;"></div>'
+    table_html += data_df.to_html(columns = display_columns, index=True, justify='center')
+    table_html += '<p>The following items were excluded from the estimate and table above:</p>'
+    table_html += '<ul>'
+    for i in excluded_indices:
+        item_name = st.session_state['wab_items'][i]['ProjectItem'].item_name
+        table_html += f'<li>{item_name}</li>'
+    for item_dict in st.session_state['final_undecided_items']:
+        item_name = item_dict.get('item_name', 'Unnamed Item')
+        table_html += f'<li>{item_name}</li>'
+    table_html += '</ul></body></html>'
+
+    return table_html
+
+
 def render_estimate_table():
+    st.divider()
+    st.markdown('### Weighted Average Bids')
+    st.markdown('_click a row to edit, delete, or view source for an item (shown below table)_')
 
     #load the data into a dataframe and get excluded_indices
     wab_data = []
@@ -348,71 +331,69 @@ def render_estimate_table():
                 cdot_name,
                 wab_index,  # index within st.session_state['wab_items']
             ])
-    st.divider()
-    st.markdown('### Weighted Average Bids\n\n_click "Source" checkbox to view citation_')
-    # st.markdown('_click "Source" checkbox to view citation_')
+
     wab_df = pd.DataFrame(wab_data, columns=['Item Name', 'Item Number', 'Unit', 'Quantity', 'Cost Data Book Year',
                                              'Weighted Average Bid', 'Calculated Cost', 'cdot_name', 'wab_index'])
-    wab_df['Source'] = False
-    wab_df['Delete'] = False
-
-    citation_available = 'unstract_response_json' in st.session_state and st.session_state[
-        'unstract_response_json'] is not None
-    col_config = {
-        'wab_index': None,  # hide index column
-        'cdot_name': None,  # hide cdot_name column
-        'Item Name': st.column_config.Column(width=200),
-        'Item Number': st.column_config.Column(width=40),
-        'Unit': st.column_config.Column(width=10),
-        'Quantity': st.column_config.NumberColumn(width=30),
-        'Cost Data Book Year': st.column_config.Column(width=80),
-        'Weighted Average Bid': st.column_config.NumberColumn('Weighted Avg Bid', format='dollar', width=90),
-        'Calculated Cost': st.column_config.NumberColumn('Calculated Cost', format='dollar', width=80),
-        'Delete': st.column_config.CheckboxColumn('Delete', help='Check to remove this item from the estimate',
-                                                  width=25),
-        'Source': st.column_config.CheckboxColumn(disabled=not citation_available,
-                                                  help='Check to show the source for this item from the estimate',
-                                                  width=25)
-    }
-    if 'editor_key' not in st.session_state:
-        st.session_state['editor_key'] = 0
-    new_wab_df = st.data_editor(
-        wab_df,
-        disabled=['Item Name', 'Item Number', 'Unit', 'Cost Data Book Year'],
-        # disable editing of all columns except WAB, quantity, and delete
-        column_config=col_config,
-        width='stretch',
-        key=st.session_state['editor_key']
-    )
-    if not citation_available:
-        st.info('Citation viewing is only available when using "unstract whisper" file processing mode.')
-
-    # check for changes / citation requests / deletions
-    for _, row in new_wab_df.iterrows():
-        idx = row['wab_index']
-        item_info_dict = st.session_state['wab_items'][idx]
-
-        if row['Delete']:
-            confirm_delete_dialog(item_info_dict['ProjectItem'].item_name, idx)
-        if row['Source']:
-            show_citation_dialog(
-                item=item_info_dict['ProjectItem'],
-                source_year=item_info_dict['matched_year'],
-                wab=item_info_dict['wab_float'],
-                cdot_name=item_info_dict['cdot_name']
-            )
-        if row['Weighted Average Bid'] != item_info_dict['wab_float']:
-            item_info_dict['wab_float'] = row['Weighted Average Bid']
-            st.session_state['wab_items'][idx] = item_info_dict
-            st.rerun()
-        if row['Quantity'] != item_info_dict['ProjectItem'].quantity:
-            item_info_dict.quantity = row['Quantity']
-            st.session_state['wab_items'][idx] = item_info_dict
-            st.rerun()
-
-    st.markdown(
-        'You can edit the WAB values and quantities directly in the table above, get citations from the original document, or delete items using the checkbox.')
     total_estimate = sum(row['Calculated Cost'] for _, row in wab_df.iterrows())
+    table_html = get_estimate_table_html(
+        source_file_name = st.session_state['saq_file_name'],
+        data_df = wab_df,
+        hidden_cols = ['cdot_name', 'wab_index'],
+        total_estimate = total_estimate,
+        excluded_indices = excluded_indices
+    )
+    st.download_button('Download Estimate Table as HTML', data=table_html, file_name=f'estimate_table_{st.session_state["saq_file_name"]}.html', mime='text/html')
+
+    grid_options = get_aggrid_options(wab_df, hidden_cols=['cdot_name', 'wab_index'])
+    wab_grid = AgGrid(
+        wab_df,
+        gridOptions = grid_options,
+        update_mode = 'SELECTION_CHANGED',
+        height = 500
+    )
+    selected = wab_grid['selected_rows']
+
+    if selected is not None and len(selected) > 0:
+        selected_row = selected.iloc[0]
+        idx = selected_row['wab_index']
+        item_info_dict = st.session_state['wab_items'][idx]
+        item = item_info_dict['ProjectItem']
+        wab = item_info_dict['wab_float']
+
+        with st.container(border=True):
+            st.markdown(f'### Selected Item : "{item.item_name}"')
+            st.markdown(
+                f'**Item Number:** {item.item_number} | **Unit:** {item.unit} | **Quantity:** {item.quantity} | **WAB:** \\$ {wab:,.2f}')
+
+            l_col, mid_col, r_col = st.columns([1,1,3])
+            with l_col.container(border=True, height = 200):
+                new_wab = st.number_input('Edit Weighted Average Bid', value=selected_row['Weighted Average Bid'], width=200)
+                if st.button('Update WAB for selected item'):
+                    item_info_dict['wab_float'] = new_wab
+                    st.session_state['wab_items'][idx] = item_info_dict
+                    st.rerun()
+
+            with mid_col.container(border=True, height = 200):
+                # st.write('')
+                new_quantity = st.number_input('Edit Quantity', value=selected_row['Quantity'], width=200)
+                if st.button('Update quantity for selected item'):
+                    item_info_dict['ProjectItem'].quantity = new_quantity
+                    st.session_state['wab_items'][idx] = item_info_dict
+                    st.rerun()
+
+            l_col2, r_col2 = st.columns([1,4])
+            if l_col2.button('View Source for Selected Item'):
+                show_citation_dialog(
+                    item=item,
+                    source_year=item_info_dict['matched_year'],
+                    wab=item_info_dict['wab_float'],
+                    cdot_name=item_info_dict['cdot_name']
+                )
+            if r_col2.button('Delete Selected Item'):
+                confirm_delete_dialog(item.item_name, idx)
+
+    st.markdown('_click a row to edit, delete, or view source for an item (shown below table)_')
+
 
     if st.button('Add Item Manually'):
         add_item_dialog()
@@ -488,9 +469,9 @@ if 'cdot_cost_data_config' not in st.session_state:
 
 
 
-if 'ddl_config' not in st.session_state:
-    with open('../proposalwriting/ddl_config.toml', 'rb') as f:
-        st.session_state['ddl_config'] = tomli.load(f)
+if 'global_config' not in st.session_state:
+    with open('../GlobalUtils/config.toml', 'rb') as f:
+        st.session_state['global_config'] = tomli.load(f)
 
 if 'config' not in st.session_state:
     with open('config.toml', 'rb') as f:
@@ -519,7 +500,7 @@ if 'cost_items_lists' not in st.session_state:
         st.session_state['cost_items_lists'].append([cost_items, cost_book_ref['year']])
 
         st.session_state['cost_item_pdf_paths'][cost_book_ref['year']] = cost_book_ref['pdf_path']
-    st.session_state['cost_items_lists'] = sorted(st.session_state['cost_items_lists'], key=lambda x: x[1], reverse=True)  # sort by year, most recent first
+    # st.session_state['cost_items_lists'] = sorted(st.session_state['cost_items_lists'], key=lambda x: x[1], reverse=True)  # sort by year, most recent first
     st.session_state['cost_items_lists'] = {year: items for items, year in st.session_state['cost_items_lists']}  # convert to dict for easy access
 
 
@@ -533,7 +514,7 @@ gray_background_css = '''
 '''
 st.html(gray_background_css)
 
-BACKGROUND_IMAGE_PATH = st.secrets.get("app_background_image_path")
+BACKGROUND_IMAGE_PATH = st.session_state['config']['app_background_image_path']
 mime_type, _ = mimetypes.guess_type(BACKGROUND_IMAGE_PATH)
 with open(BACKGROUND_IMAGE_PATH, "rb") as image_file:
     encoded = base64.b64encode(image_file.read()).decode()
@@ -560,7 +541,8 @@ translucent_bg_element="""
     background-color: rgba(220,220,220,.9);
     background-size: cover;
     padding: 25px;
-}"""
+}
+</style>"""
 st.html(translucent_bg_element)
 
 # glowing aura for citations
@@ -601,17 +583,24 @@ main_container = center.container(key='translucent') # central container, for co
 l_margin, main_col, r_margin = main_container.columns([1, 10, 1])
 
 with main_col:
-    st.title('Engineer\'s Estimate')
+    title_col, help_col = st.columns([8, 1])
+    with title_col:
+        st.title('Engineer\'s Estimate')
+    with help_col:
+        st.write('')  # spacing
+        if st.button(':material/help: Help', type='tertiary', use_container_width=True):
+            show_help_dialog()
     st.markdown('_AI generated results are not guaranteed to be accurate._  \n**Uploaded files will be sent to OpenAI and Anthropic via API. Their policies (as of 11/18/25) are not to use this data to train their models. Check the [OpenAI:material/open_in_new:](https://platform.openai.com/docs/guides/your-data) and [Anthropic:material/open_in_new:](https://privacy.claude.com/en/collections/10663361-commercial-customers) privacy pages for the most recent privacy information.**')
 
     saq_file = st.file_uploader("Upload project items table (PDF only)", accept_multiple_files=False, width = 500, type = 'pdf')
 
-    file_processing_mode = st.pills(
-        label = 'file processing mode ("unstract whisper" recommended)', options=['unstract whisper', 'google ocr', 'none'], default = 'unstract whisper', selection_mode = 'single')
-
     if st.button('Get Engineers Estimate', disabled = (saq_file is None)):
-        generate_estimate(saq_file, file_processing_mode)
-        st.rerun()
+        if 'wab_items' in st.session_state:
+            confirm_rerun_dialog()
+        else:
+            st.session_state['saq_file_name'] = saq_file.name
+            generate_estimate(saq_file)
+            st.rerun()
     if 'wab_items' in st.session_state:
         render_estimate_table()
 st.container(height = 400, border = False) # if you want to be able to scroll to see the background

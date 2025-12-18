@@ -3,8 +3,11 @@ Please extract all items from the provided project table, and return them in a J
 - `item_name`: The item name from the project table
 - `unit`: The unit of measurement for the item
 - `quantity`: The total amount of the item, taken from the project total  
-It is very important that the quantity be the project total for that item.
-Output only the JSON array, *without* any additional text, code fences, or explanation.
+
+Important notes:
+- It is very important that the quantity be the project total for that item.
+- Copy each field exactly as it appears in the project table, including spelling and capitalization.
+- Output only the JSON array, *without* any additional text, code fences, or explanation.
 
 Example output format:
 [

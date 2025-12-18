@@ -10,4 +10,5 @@ __pycache__/
 documents/
 citation_pdfs/
 assets/
+ssl/
 static/

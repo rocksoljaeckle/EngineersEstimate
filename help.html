@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engineer's Estimate - Help</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a365d;
+            border-bottom: 3px solid #3182ce;
+            padding-bottom: 15px;
+            margin-top: 0;
+        }
+        h2 {
+            color: #2c5282;
+            margin-top: 35px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+        h3 {
+            color: #4a5568;
+            margin-top: 25px;
+        }
+        .highlight-box {
+            background: #ebf8ff;
+            border-left: 4px solid #3182ce;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .warning-box {
+            background: #fffaf0;
+            border-left: 4px solid #dd6b20;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .success-box {
+            background: #f0fff4;
+            border-left: 4px solid #38a169;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        code {
+            background: #edf2f7;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: #3182ce;
+            color: white;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        .workflow-step {
+            display: flex;
+            align-items: flex-start;
+            margin: 15px 0;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+        .workflow-step-content {
+            flex: 1;
+        }
+        .workflow-step-content strong {
+            color: #2d3748;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background: #edf2f7;
+            color: #4a5568;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #f7fafc;
+        }
+        .icon {
+            font-size: 1.2em;
+            margin-right: 8px;
+        }
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            color: #718096;
+            font-size: 0.9em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Engineer's Estimate - User Guide</h1>
+
+        <div class="highlight-box">
+            <strong>What is this app?</strong><br>
+            Engineer's Estimate is an AI-powered tool that automatically calculates cost estimates for construction projects using CDOT (Colorado Department of Transportation) historical cost data.
+        </div>
+
+        <h2>Overview</h2>
+        <p>This application streamlines the process of creating engineer's cost estimates by:</p>
+        <ol>
+            <li>Extracting project items from your uploaded PDF (Schedule of Anticipated Quantities)</li>
+            <li>Matching those items against CDOT historical cost data books (2022-2024)</li>
+            <li>Retrieving Weighted Average Bids (WABs) for each item</li>
+            <li>Computing the total project estimate</li>
+        </ol>
+
+        <h2>How to Use the App</h2>
+
+        <h3>Step 1: Upload Your Document</h3>
+        <div class="workflow-step">
+            <span class="step-number">1</span>
+            <div class="workflow-step-content">
+                <strong>Upload a PDF file</strong> containing your project items table (SAQ - Schedule of Anticipated Quantities). The PDF should contain a table with columns for item number, item name, unit, and quantity.
+            </div>
+        </div>
+
+        <h3>Step 2: Generate the Estimate</h3>
+        <div class="workflow-step">
+            <span class="step-number">2</span>
+            <div class="workflow-step-content">
+                <strong>Click "Get Engineers Estimate"</strong> to start the estimation process. This may take several minutes as the app:
+                <ul>
+                    <li>Uses OCR to extract text from your PDF</li>
+                    <li>Uses two AI models (OpenAI and Claude) to extract project items</li>
+                    <li>Cross-references results for accuracy</li>
+                    <li>Searches historical cost data for matching items</li>
+                    <li>Retrieves weighted average bids</li>
+                </ul>
+            </div>
+        </div>
+
+        <h3>Step 3: Review Results</h3>
+        <div class="workflow-step">
+            <span class="step-number">3</span>
+            <div class="workflow-step-content">
+                <strong>Review the results table</strong> showing all extracted items with their WABs and calculated costs. The table displays:
+                <ul>
+                    <li><strong>Item Name</strong> - The name of the construction item</li>
+                    <li><strong>Item Number</strong> - The CDOT item code</li>
+                    <li><strong>Unit</strong> - Unit of measurement (SY, LF, EA, etc.)</li>
+                    <li><strong>Quantity</strong> - The quantity from your document</li>
+                    <li><strong>Cost Data Book Year</strong> - Which year's data was used (2024, 2023, or 2022)</li>
+                    <li><strong>Weighted Average Bid</strong> - The WAB per unit from historical data</li>
+                    <li><strong>Calculated Cost</strong> - Quantity x WAB</li>
+                </ul>
+            </div>
+        </div>
+
+        <h2>Working with the Results Table</h2>
+
+        <h3>Selecting and Editing Items</h3>
+        <p>Click any row in the table to select it. Once selected, you can:</p>
+        <ul>
+            <li><strong>Edit Weighted Average Bid</strong> - Enter a new WAB value and click "Update WAB for selected item"</li>
+            <li><strong>Edit Quantity</strong> - Correct the quantity if it was extracted incorrectly</li>
+            <li><strong>View Source</strong> - See the original citation from both your document and the CDOT cost data book</li>
+            <li><strong>Delete Item</strong> - Remove the item from the estimate (with confirmation)</li>
+        </ul>
+
+        <h3>Viewing Source Citations</h3>
+        <div class="highlight-box">
+            When you click "View Source for Selected Item", the app will show you highlighted excerpts from:
+            <ul>
+                <li><strong>SAQ Source</strong> - The original location in your uploaded document</li>
+                <li><strong>CDOT Cost Data Book Source</strong> - The matching entry in the historical cost data</li>
+            </ul>
+            <em>Scroll on citation images to zoom in for better detail.</em>
+        </div>
+
+        <h2>Handling Excluded Items</h2>
+
+        <div class="warning-box">
+            <strong>Why are some items excluded?</strong><br>
+            Items may be excluded from the estimate if:
+            <ul>
+                <li>The WAB could not be determined from historical data</li>
+                <li>The item couldn't be confidently parsed from your document</li>
+                <li>The two AI models disagreed on the item details and reconciliation failed</li>
+            </ul>
+        </div>
+
+        <p>For excluded items, you can:</p>
+        <ol>
+            <li>Review the item details shown in the expander</li>
+            <li>Enter the missing information (WAB, item name, number, unit, quantity)</li>
+            <li>Click "Add to Estimate" to include the item</li>
+            <li>Or click "Delete Item" if it's a duplicate or shouldn't be included</li>
+        </ol>
+
+        <h3>Adding Items Manually</h3>
+        <p>Click the "Add Item Manually" button to add items that weren't captured from your document. You'll need to provide:</p>
+        <ul>
+            <li>Item name</li>
+            <li>Item number</li>
+            <li>Unit</li>
+            <li>Quantity</li>
+            <li>Weighted Average Bid (per unit)</li>
+        </ul>
+
+        <h2>Downloading Your Estimate</h2>
+        <div class="success-box">
+            Click the <strong>"Download Estimate Table as HTML"</strong> button to download a standalone HTML file containing your complete estimate. This file includes:
+            <ul>
+                <li>All items with their costs</li>
+                <li>The total engineer's estimate</li>
+                <li>A list of any excluded items</li>
+            </ul>
+        </div>
+
+        <h2>Understanding the Total Estimate</h2>
+
+        <table>
+            <tr>
+                <th>Status</th>
+                <th>Color</th>
+                <th>Meaning</th>
+            </tr>
+            <tr>
+                <td>Complete</td>
+                <td style="color: #38a169;">Green</td>
+                <td>All items were successfully matched and included in the estimate</td>
+            </tr>
+            <tr>
+                <td>Incomplete</td>
+                <td style="color: #e53e3e;">Red</td>
+                <td>Some items were excluded - review and add missing WABs to complete the estimate</td>
+            </tr>
+        </table>
+
+        <h2>Tips for Best Results</h2>
+        <ul>
+            <li><strong>Use clear PDFs</strong> - Scanned documents work, but clearer PDFs produce better extraction results</li>
+            <li><strong>Standard formatting</strong> - Tables with clear columns for item number, name, unit, and quantity extract most reliably</li>
+            <li><strong>Review all items</strong> - Always verify the extracted quantities and WABs before finalizing your estimate</li>
+            <li><strong>Check excluded items</strong> - Items that couldn't be automatically matched may still be valid - just add the WAB manually</li>
+        </ul>
+
+        <h2>Data Privacy</h2>
+        <div class="warning-box">
+            <strong>Important:</strong> Uploaded files are sent to OpenAI and Anthropic via API for processing. According to their policies (as of November 2025), this data is not used to train their models. Please review their current privacy policies for the most up-to-date information.
+        </div>
+
+        <h2>Technical Details</h2>
+        <p>The app uses a dual-extraction approach with both OpenAI and Claude models to maximize accuracy:</p>
+        <ul>
+            <li>Items where both models agree are automatically accepted</li>
+            <li>Items with discrepancies are re-checked for reconciliation</li>
+            <li>Unresolved items are flagged for manual review</li>
+        </ul>
+        <p>Cost data is searched in descending chronological order (2024, 2023, 2022) to prioritize the most recent pricing data.</p>
+
+        <footer>
+            <p>Engineer's Estimate Application</p>
+            <p><em>AI-generated results are not guaranteed to be accurate. Always verify estimates before use.</em></p>
+        </footer>
+    </div>
+</body>
+</html>
