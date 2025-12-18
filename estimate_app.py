@@ -320,7 +320,7 @@ def render_estimate_table():
         if wab is None:
             excluded_indices.append(wab_index)
         else:
-            wab_data.append([
+            data_row = [
                 item.item_name,
                 item.item_number,
                 item.unit,
@@ -330,7 +330,9 @@ def render_estimate_table():
                 wab * item.quantity,
                 cdot_name,
                 wab_index,  # index within st.session_state['wab_items']
-            ])
+            ]
+            data_row = [item.round(2) if isinstance(item, float) else item for item in data_row]
+            wab_data.append(data_row)
 
     wab_df = pd.DataFrame(wab_data, columns=['Item Name', 'Item Number', 'Unit', 'Quantity', 'Cost Data Book Year',
                                              'Weighted Average Bid', 'Calculated Cost', 'cdot_name', 'wab_index'])

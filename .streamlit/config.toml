@@ -3,6 +3,7 @@ enableStaticServing = true
 # port = 8510
 # sslCertFile = "ssl/domain.crt"
 # sslKeyFile = "ssl/domain.key"
+# reinstate for local development
 
 [ui]
 hideTopBar = true
