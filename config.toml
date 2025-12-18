@@ -4,7 +4,7 @@ openai_extract_project_items_prompt_path = 'prompts/openai_extract_project_items
 claude_extract_project_items_prompt_path = 'prompts/claude_extract_project_items_prompt.md'
 search_agent_prompt_path = 'prompts/search_extract_item_choice.md'
 citation_prompt_path = 'prompts/global_prompts/citation_prompt.md'
-cost_data_citation_prompt_path = 'prompts/cost_data_prompts/cost_data_citation_prompt.md'
+cost_data_citation_prompt_path = 'prompts/cost_data_prompts/cdot_cost_data_citation_prompt.md'
 
 citation_cache_json_path = 'citation_cache/citation_cache.json'
 citation_images_cache_dir = 'citation_cache/cached_images'

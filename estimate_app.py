@@ -463,6 +463,7 @@ def render_estimate_table():
 
 
 print('debug statements:')
+print(st.session_state['config'])
 print(os.listdir('.')) # TODO REMOVE
 print(os.listdir('prompts')) # TODO REMOVE
 print(os.listdir('assets')) # TODO REMOVE
